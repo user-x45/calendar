@@ -48,6 +48,7 @@ button.p:hover{background:var(--ac2)}button:disabled{opacity:.5}
 .ev{background:var(--bg);border-left:4px solid var(--ac);border-radius:8px;padding:8px 12px;margin:8px 0;font-size:14px}
 .mu{color:var(--mu);font-size:13px}
 .act{display:flex;gap:10px;justify-content:flex-end}
+#st{display:flex;align-items:center;gap:10px}.sp{width:18px;height:18px;flex:none;border:3px solid var(--soft);border-top-color:var(--ac);border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}#drop.busy{opacity:.6;pointer-events:none}
 #rs{margin:0 0 10px;min-height:0}#rs:empty{display:none}
 </style>
 </head>
@@ -80,11 +81,11 @@ button.p:hover{background:var(--ac2)}button:disabled{opacity:.5}
 <script>
 var API="https://calendar.user-x45.workers.dev";
 var $=function(i){return document.getElementById(i)},events=[],TZ="Asia/Tokyo";
-function st(t){$("st").textContent=t}
+function st(t,load){var el=$("st");el.textContent="";if(load){var s=document.createElement("span");s.className="sp";el.appendChild(s)}el.appendChild(document.createTextNode(t));$("drop").classList.toggle("busy",!!load)}
 
 $("file").onchange=async function(e){
   var f=e.target.files[0];if(!f)return;
-  events=[];st("読み込み中…");
+  events=[];st("読み込み中…",true);
   try{
     var wb=XLSX.read(await f.arrayBuffer(),{cellDates:true}),rows=[];
     wb.SheetNames.forEach(function(n){
@@ -96,10 +97,10 @@ $("file").onchange=async function(e){
     var chunks=[];for(var i=0;i<rows.length;i+=size)chunks.push(rows.slice(i,i+size));
     var done=0,par=3;
     for(var i=0;i<chunks.length;i+=par){
-      st("AI解析中… "+done+"/"+chunks.length);
+      st("AI解析中… "+done+"/"+chunks.length,true);
       var res=await Promise.all(chunks.slice(i,i+par).map(function(ch){
         return fetch(API+"/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({today:today,rows:ch})})
-          .then(function(r){return r.json()}).then(function(d){done++;st("AI解析中… "+done+"/"+chunks.length);return d.events||[]});
+          .then(function(r){return r.json()}).then(function(d){done++;st("AI解析中… "+done+"/"+chunks.length,true);return d.events||[]});
       }));
       res.forEach(function(a){events=events.concat(a)});
     }
