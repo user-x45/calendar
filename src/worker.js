@@ -1,4 +1,4 @@
-const MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
 const SYSTEM = `あなたはExcelの行データからカレンダー予定を抽出するアシスタントです。
 入力は表の先頭行(見出し)と複数の行です。予定として登録すべき行だけを判断し、次のJSONのみを出力してください。説明文は禁止。
@@ -17,13 +17,15 @@ export default {
       try {
         const { rows, today } = await req.json();
         const out = await env.AI.run(MODEL, {
-          max_tokens: 2048,
+          max_tokens: 4096,
           messages: [
             { role: "system", content: SYSTEM },
             { role: "user", content: "今日の日付: " + today + "\n" + JSON.stringify(rows) },
           ],
         });
-        const text = typeof out.response === "string" ? out.response : JSON.stringify(out.response);
+        const msg = out.choices && out.choices[0] && out.choices[0].message;
+        const raw = typeof out.response === "string" ? out.response : (msg && msg.content) || out.response || out;
+        const text = typeof raw === "string" ? raw : JSON.stringify(raw);
         const m = text.match(/\{[\s\S]*\}/);
         const data = m ? JSON.parse(m[0]) : { events: [] };
         return Response.json({ events: Array.isArray(data.events) ? data.events : [] });
