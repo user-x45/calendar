@@ -6,7 +6,7 @@ const CORS = {
 };
 const json = (obj, status = 200) => Response.json(obj, { status, headers: CORS });
 
-const MODEL = "@cf/google/gemma-4-26b-a4b-it";
+const MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
 
 const SYSTEM = `あなたはExcelの行データからカレンダー予定を抽出するアシスタントです。
 入力は表の先頭行(見出し)と複数の行です。予定として登録すべき行だけを判断し、次のJSONのみを出力してください。説明文は禁止。
@@ -49,13 +49,21 @@ function normalize(ev, rows) {
   const idx = Number.isInteger(ev.row) ? ev.row : parseInt(ev.row, 10);
   if (!title) title = fallbackTitle(rows[idx]);
   if (!title) title = "(無題の予定)";
+  const fixDate = (v) => {
+    const m = String(v ?? "").match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+    return m ? m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0") : null;
+  };
+  const fixTime = (v) => {
+    const m = String(v ?? "").match(/(\d{1,2}):(\d{2})/);
+    return m ? m[1].padStart(2, "0") + ":" + m[2] : null;
+  };
   const nul = (v) => (v == null || v === "null" || v === "" ? null : v);
   return {
     title,
-    date: nul(ev.date),
-    start: nul(ev.start),
-    end: nul(ev.end),
-    allDay: ev.allDay === true || ev.allDay === "true" || !nul(ev.start),
+    date: fixDate(ev.date),
+    start: fixTime(ev.start),
+    end: fixTime(ev.end),
+    allDay: !fixTime(ev.start),
     location: nul(ev.location) || "",
     description: nul(ev.description) || "",
   };
@@ -83,18 +91,19 @@ export default {
         const { rows, today } = await req.json();
         const numbered = rows.map((r, i) => ({ row: i, header: r.header, cells: r.row }));
         const out = await env.AI.run(MODEL, {
-          max_tokens: 2048,
+          max_tokens: 4096,
+          chat_template_kwargs: { enable_thinking: false },
           temperature: 0,
           messages: [
             { role: "system", content: SYSTEM },
-            { role: "user", content: "今日の日付: " + today + "\n" + JSON.stringify(numbered) },
+            { role: "user", content: "今日の日付: " + today + "\n" + JSON.stringify(numbered) + "\n/no_think" },
           ],
         });
         const msg = out.choices && out.choices[0] && out.choices[0].message;
         const raw = typeof out.response === "string" ? out.response : (msg && msg.content) || out.response || out;
         const text = (typeof raw === "string" ? raw : JSON.stringify(raw)).replace(/<think>[\s\S]*?<\/think>/g, "");
         const events = parseEvents(text).map((e) => normalize(e, rows)).filter((e) => e && e.date);
-        return json({ events });
+        return json(events.length ? { events } : { events, debug: text.slice(0, 1500) });
       } catch (e) {
         return json({ error: String(e), events: [] }, 500);
       }
