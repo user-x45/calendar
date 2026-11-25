@@ -6,7 +6,7 @@ const CORS = {
 };
 const json = (obj, status = 200) => Response.json(obj, { status, headers: CORS });
 
-const MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
+const MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
 const SYSTEM = `あなたはExcelの行データからカレンダー予定を抽出するアシスタントです。
 入力は表の先頭行(見出し)と複数の行です。予定として登録すべき行だけを判断し、次のJSONのみを出力してください。説明文は禁止。
