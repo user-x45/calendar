@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Excel → カレンダー</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{--bg:#f4f6fb;--card:#fff;--tx:#18202f;--mu:#6b7488;--ac:#2563eb;--ac2:#1d4ed8;--soft:#eaf0ff;--bd:#e3e7f0;--sh:0 1px 2px #1018280d,0 8px 24px #1018280f}
 @media(prefers-color-scheme:dark){:root{--bg:#0f1218;--card:#181c25;--tx:#e9ecf3;--mu:#97a0b4;--ac:#6190ff;--ac2:#7aa0ff;--soft:#1f2a47;--bd:#2a3040;--sh:0 1px 2px #0006,0 8px 24px #0004}}
@@ -56,9 +55,9 @@ button.p:hover{background:var(--ac2)}button:disabled{opacity:.5}
 <main>
 <header>
 <div class="logo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18M8 14h3"/></svg></div>
-<div><h1>Excel → カレンダー</h1><p class="sub">ExcelをAIが読み取り、ICSファイルの書き出し、またはGoogleカレンダーへ直接追加します</p></div>
+<div><h1>Excel → カレンダー</h1><p class="sub">ExcelをAIが読み取り、ICSファイルとして書き出します</p></div>
 </header>
-<div class="steps"><span><b>1</b>アップロード</span><span><b>2</b>内容を確認・編集</span><span><b>3</b>ICS書き出し / 直接追加</span></div>
+<div class="steps"><span><b>1</b>アップロード</span><span><b>2</b>内容を確認・編集</span><span><b>3</b>ICS書き出し</span></div>
 <div class="card">
 <label id="drop" for="file">
 <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
@@ -70,7 +69,7 @@ button.p:hover{background:var(--ac2)}button:disabled{opacity:.5}
 </div>
 <div class="card" id="res" hidden>
 <div class="tw"><table><thead><tr><th></th><th>タイトル</th><th>日付</th><th>開始</th><th>終了</th><th>終日</th><th>場所</th><th>メモ</th></tr></thead><tbody id="tb"></tbody></table></div>
-<div class="bar"><input type="text" id="cid" placeholder="Google OAuthクライアントID(直接追加する場合のみ)"><button id="ics">ICSファイルで書き出し…</button><button class="p" id="add">Googleカレンダーに直接追加…</button></div>
+<div class="bar"><button class="p" id="ics">ICSファイルで書き出し…</button></div>
 </div>
 </main>
 <div id="dlg"><div class="box">
@@ -81,9 +80,6 @@ button.p:hover{background:var(--ac2)}button:disabled{opacity:.5}
 <script>
 var API="https://calendar.user-x45.workers.dev";
 var $=function(i){return document.getElementById(i)},events=[],TZ="Asia/Tokyo";
-var CID="526950970428-3hq5jjefvfrkf99q615pdbvi2i2viiou.apps.googleusercontent.com";
-$("cid").value=localStorage.getItem("cid")||CID;
-$("cid").onchange=function(){localStorage.setItem("cid",this.value.trim())};
 function st(t){$("st").textContent=t}
 
 $("file").onchange=async function(e){
@@ -134,16 +130,14 @@ function sel(){return events.filter(function(x){return x.on&&x.title&&x.date})}
 
 var mode="api";
 $("ics").onclick=function(){openDlg("ics")};
-$("add").onclick=function(){openDlg("api")};
 function openDlg(m){
   mode=m;var s=sel();if(!s.length){alert("追加する予定がありません");return}
-  if(m==="api"&&!$("cid").value.trim()){alert("OAuthクライアントIDを入力してください");return}
-  $("dt").textContent=m==="api"?"この内容でGoogleカレンダーに追加しますか?":"この内容でICSファイルを書き出しますか?";
-  $("ok").textContent=m==="api"?"追加する":"ダウンロード";
+  $("dt").textContent="この内容でICSファイルを書き出しますか?";
+  $("ok").textContent="ダウンロード";
   $("list").innerHTML=s.map(function(x){
     var when=x.allDay?x.date+"(終日)":x.date+" "+(x.start||"00:00")+" – "+(x.end||"+1時間");
     return '<div class="ev"><b>'+esc(x.title)+'</b><br>'+esc(when)+(x.location?"<br>📍"+esc(x.location):"")+(x.description?'<br><span class="mu">'+esc(x.description)+"</span>":"")+"</div>";
-  }).join("")+"<p><b>"+s.length+"件</b>を追加します。</p>";
+  }).join("")+"<p><b>"+s.length+"件</b>を書き出します。</p>";
   $("rs").textContent="";$("dlg").style.display="flex";
 }
 $("no").onclick=function(){$("dlg").style.display="none"};
@@ -178,29 +172,10 @@ function ics(list){
   L.push("END:VCALENDAR");return L.join("\r\n")+"\r\n";
 }
 $("ok").onclick=function(){
-  if(mode==="ics"){
-    var s=sel(),a=document.createElement("a");
-    a.href=URL.createObjectURL(new Blob([ics(s)],{type:"text/calendar;charset=utf-8"}));
-    a.download="events.ics";a.click();
-    $("rs").textContent=s.length+"件を events.ics に書き出しました。Googleカレンダーの「設定 → インポート」で読み込んでください。";
-    return;
-  }
-  if(!window.google){$("rs").textContent="Google認証ライブラリを読み込めません。ネットワークを確認するか、ICS書き出しを使ってください。";return}
-  $("ok").disabled=true;$("rs").textContent="Google認証中…";
-  google.accounts.oauth2.initTokenClient({
-    client_id:$("cid").value.trim(),
-    scope:"https://www.googleapis.com/auth/calendar.events",
-    callback:async function(t){
-      if(t.error){$("rs").textContent="認証エラー: "+t.error;$("ok").disabled=false;return}
-      var s=sel(),okc=0,ng=0;
-      for(var i=0;i<s.length;i++){
-        $("rs").textContent="登録中… "+(i+1)+"/"+s.length;
-        var r=await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events",{method:"POST",headers:{Authorization:"Bearer "+t.access_token,"Content-Type":"application/json"},body:JSON.stringify(body(s[i]))});
-        r.ok?okc++:ng++;
-      }
-      $("rs").textContent="完了: 成功 "+okc+"件 / 失敗 "+ng+"件";$("ok").disabled=false;
-    }
-  }).requestAccessToken();
+  var s=sel(),a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([ics(s)],{type:"text/calendar;charset=utf-8"}));
+  a.download="events.ics";a.click();
+  $("rs").textContent=s.length+"件を events.ics に書き出しました。Googleカレンダーの「設定 → インポート」で読み込んでください。";
 };
 
 var dz=$("drop");
