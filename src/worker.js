@@ -1,3 +1,11 @@
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Max-Age": "86400",
+};
+const json = (obj, status = 200) => Response.json(obj, { status, headers: CORS });
+
 const MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 
 const SYSTEM = `あなたはExcelの行データからカレンダー予定を抽出するアシスタントです。
@@ -13,6 +21,9 @@ const SYSTEM = `あなたはExcelの行データからカレンダー予定を�
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
+    if (url.pathname === "/api/analyze" && req.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: CORS });
+    }
     if (url.pathname === "/api/analyze" && req.method === "POST") {
       try {
         const { rows, today } = await req.json();
@@ -29,9 +40,9 @@ export default {
         const text = typeof raw === "string" ? raw : JSON.stringify(raw);
         const m = text.match(/\{[\s\S]*\}/);
         const data = m ? JSON.parse(m[0]) : { events: [] };
-        return Response.json({ events: Array.isArray(data.events) ? data.events : [] });
+        return json({ events: Array.isArray(data.events) ? data.events : [] });
       } catch (e) {
-        return Response.json({ error: String(e), events: [] }, { status: 500 });
+        return json({ error: String(e), events: [] }, 500);
       }
     }
     return new Response("Not found", { status: 404 });
