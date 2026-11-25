@@ -100,7 +100,7 @@ $("file").onchange=async function(e){
       st("AI解析中… "+done+"/"+chunks.length,true);
       var res=await Promise.all(chunks.slice(i,i+par).map(function(ch){
         return fetch(API+"/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({today:today,rows:ch})})
-          .then(function(r){return r.json()}).then(function(d){done++;st("AI解析中… "+done+"/"+chunks.length,true);return d.events||[]});
+          .then(function(r){return r.json()}).then(function(d){if(d.debug||d.error)console.warn("AI応答:",d);done++;st("AI解析中… "+done+"/"+chunks.length,true);return d.events||[]});
       }));
       res.forEach(function(a){events=events.concat(a)});
     }
